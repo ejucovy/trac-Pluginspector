@@ -204,7 +204,11 @@ title: Index
 </ul>
 """
             tmpl = tempita.HTMLTemplate(tmpl)
-            html = tmpl.substitute(locals())
+            html = tmpl.substitute(dict(
+                    components=sorted(components),
+                    interfaces=sorted(interfaces),
+                    packages=sorted(packages),
+                    ))
             zipfile.writestr("index.html", html)
 
         finally:
