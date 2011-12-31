@@ -14,7 +14,7 @@ setup(name='pluginspector',
       include_package_data=True,
       package_data={ 'pluginspector': ['templates/*', 'htdocs/*'] },
       zip_safe=False,
-      install_requires=["Tempita"],
+      install_requires=["Tempita", "zope.dottedname"],
       entry_points = """
       [trac.plugins]
       pluginspector = pluginspector

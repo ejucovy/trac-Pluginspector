@@ -10,12 +10,17 @@ import re
 from unzip import unzip
 
 from trac.core import *
+from trac.config import *
 
 from trac.admin.api import IAdminCommandProvider
+
+from zope.dottedname.resolve import resolve
 
 class Pluginspector(Component):
 
     implements(IAdminCommandProvider)
+
+    pkg_src_dir = Option("pluginspector", 'pkg_src_dir', './src', """Where I can find source files for Trac and plugins""")
 
     ### methods for IAdminCommandProvider
 
@@ -23,12 +28,34 @@ class Pluginspector(Component):
     administration interface `trac-admin`.
     """
 
+    def try_to_find_package(self, object):
+        module = resolve(object.__module__)
+        file = module.__file__
+        assert file.startswith(self.pkg_src_dir)
+        dir, path = file[len(self.pkg_src_dir):].split("/", 1)
+        setup_py = os.path.join(self.pkg_src_dir, dir, "setup.py")
+        assert os.path.exists(setup_py), "No file %s exists" % setup_py
+        with open(setup_py) as f:
+            contents = f.read()
+        contents = contents.replace("setup(", "metadata=dict(")
+        ctx = {}
+        exec contents in ctx
+        assert 'metadata' in ctx, "Problem running %s" % setup_py
+        return ctx['metadata']['name']
+
     def get_data(self):
+        packages = {}
+
         interfaces = {}
         for interface in Interface.__subclasses__():
             data = self._base_data(interface)
             data['implemented_by'] = []
             interfaces[data['name']] = data
+            data['package'] = self.try_to_find_package(interface)
+            packages.setdefault(data['package'], 
+                                {'interfaces': [],
+                                 'components': [],
+                                 })['interfaces'].append(data['name'])
 
         components = {}
         for component in Component.__subclasses__():
@@ -43,8 +70,13 @@ class Pluginspector(Component):
             for imp in impl:
                 imp['implemented_by'].append(data['name'])
             components[data['name']] = data
+            data['package'] = self.try_to_find_package(component)
+            packages.setdefault(data['package'], 
+                                {'interfaces': [],
+                                 'components': [],
+                                 })['components'].append(data['name'])
 
-        return components, interfaces
+        return components, interfaces, packages
 
     def write_zipfile(self, dir):
         import os
@@ -56,16 +88,20 @@ class Pluginspector(Component):
                                             suffix=".zip")
         zipfile = ZipFile(zip_filename, 'w')
         try:
-            components, interfaces = self.get_data()
+            components, interfaces, packages = self.get_data()
 
             tmpl = """---
 layout: main
 title: {{name}}
 ---
 <h1 class="name">{{name}}</h1>
+<h2 class="package">In package <a href="packages/{{package}}/index.html">{{package}}</a></h2>
 
+{{if doc}}
 <pre class="doc">{{doc}}</pre>
-
+{{else}}
+<p><em>No documentation available</em></p>
+{{endif}}
 <h2>Implemented by:</h2>
 <ul>
 {{for component in implemented_by}}
@@ -83,6 +119,7 @@ layout: main
 title: {{name}}
 ---
 <h1 class="name">{{name}}</h1>
+<h2 class="package">In package <a href="packages/{{package}}/index.html">{{package}}</a></h2>
 
 <pre class="doc">{{doc}}</pre>
 
@@ -101,9 +138,50 @@ title: {{name}}
 
             tmpl = """---
 layout: main
+title: {{name}}
+---
+<h1 class="name">{{name}}</h1>
+
+{{if doc}}
+<pre class="doc">{{doc}}</pre>
+{{else}}
+<p><em>No documentation available</em></p>
+{{endif}}
+<h2>Interfaces Declared:</h2>
+<ul>
+{{for interface in interfaces}}
+  <li><a href="interfaces/{{interface}}/index.html">{{interface}}</a></li>
+{{endfor}}
+</ul>
+<h2>Components Provided:</h2>
+<ul>
+{{for component in components}}
+  <li><a href="components/{{component}}/index.html">{{component}}</a></li>
+{{endfor}}
+</ul>
+"""
+            tmpl = tempita.HTMLTemplate(tmpl)
+            for package in packages:
+                ctx = dict(name=package,
+                           interfaces=packages[package]['interfaces'],
+                           components=packages[package]['components'],
+                           doc=None,
+                           )
+                html = tmpl.substitute(ctx)
+                zipfile.writestr("packages/%s/index.html" % package, html)
+
+            tmpl = """---
+layout: main
 title: Index
 ---
 <h1 class="name">Trac Docs</h1>
+
+<h2>Packages</h2>
+<ul>
+{{for package in packages}}
+  <li><a href="packages/{{package}}/index.html">{{package}}</a></li>
+{{endfor}}
+</ul>
 
 <h2>Interfaces</h2>
 <ul>
