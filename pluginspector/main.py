@@ -66,6 +66,7 @@ class Pluginspector(Component):
             packages[data['package']]['metadata'] = metadata
 
         components = {}
+        options = {}
         for component in Component.__subclasses__():
             if hasattr(component, '_implements'):
                 impl = [interfaces['%s.%s' % (i.__module__, i.__name__)]
@@ -85,7 +86,27 @@ class Pluginspector(Component):
                                  })['components'].append(data['name'])
             packages[data['package']]['metadata'] = metadata
 
-        return components, interfaces, packages
+            _options = []
+
+            for attr in dir(component):
+                obj = getattr(component, attr, None)
+                try:
+                    if obj and issubclass(obj.__class__, Option):
+                        _options.append(obj)
+                except:
+                    continue
+
+            data['options'] = ["%s/%s" % (i.section, i.name) 
+                               for i in _options]
+            for opt in _options:
+                opt_name = "%s/%s" % (opt.section, opt.name)
+                options[opt_name] = {
+                    'name': opt.name,
+                    'section': opt.section,
+                    'type': opt.__class__.__name__,
+                    'default': opt.default
+                    }
+        return components, interfaces, packages, options
 
     def write_zipfile(self, dir):
         import os
@@ -97,8 +118,7 @@ class Pluginspector(Component):
                                             suffix=".zip")
         zipfile = ZipFile(zip_filename, 'w')
         try:
-            components, interfaces, packages = self.get_data()
-
+            components, interfaces, packages, options = self.get_data()
             tmpl = """---
 layout: main
 title: {{name}}
