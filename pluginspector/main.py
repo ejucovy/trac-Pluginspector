@@ -6,6 +6,8 @@ http://trac.edgewall.org
 
 import inspect
 import re
+import os
+import sys
 
 from unzip import unzip
 
@@ -39,7 +41,11 @@ class Pluginspector(Component):
             contents = f.read()
         contents = contents.replace("setup(", "metadata=dict(")
         ctx = {}
-        exec contents in ctx
+        try:
+            exec contents in ctx
+        except:
+            print >> sys.stderr, "Could not execute %s" % setup_py
+            return '<Error finding package for %s>' % object.__module__
         assert 'metadata' in ctx, "Problem running %s" % setup_py
         return ctx['metadata']['name']
 
