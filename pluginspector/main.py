@@ -58,11 +58,13 @@ class Pluginspector(Component):
         try:
             components, interfaces = self.get_data()
 
-            tmpl = """
-<html><head><base href="http://ejucovy.github.com/trac-docs/"><body>
+            tmpl = """---
+layout: main
+title: {{name}}
+---
 <h1 class="name">{{name}}</h1>
 
-<p class="doc">{{doc}}</p>
+<pre class="doc">{{doc}}</pre>
 
 <h2>Implemented by:</h2>
 <ul>
@@ -70,18 +72,19 @@ class Pluginspector(Component):
   <li><a href="components/{{component}}/index.html">{{component}}</a></li>
 {{endfor}}
 </ul>
-</body></html>
 """
             tmpl = tempita.HTMLTemplate(tmpl)
             for name in interfaces:
                 html = tmpl.substitute(interfaces[name])
                 zipfile.writestr("interfaces/%s/index.html" % name, html)
 
-            tmpl = """
-<html><head><base href="http://ejucovy.github.com/trac-docs/"><body>
+            tmpl = """---
+layout: main
+title: {{name}}
+---
 <h1 class="name">{{name}}</h1>
 
-<p class="doc">{{doc}}</p>
+<pre class="doc">{{doc}}</pre>
 
 <h2>Implements:</h2>
 <ul>
@@ -89,7 +92,6 @@ class Pluginspector(Component):
   <li><a href="interfaces/{{interface}}/index.html">{{interface}}</a></li>
 {{endfor}}
 </ul>
-</body></html>
 """
             tmpl = tempita.HTMLTemplate(tmpl)
 
@@ -97,8 +99,10 @@ class Pluginspector(Component):
                 html = tmpl.substitute(components[name])
                 zipfile.writestr("components/%s/index.html" % name, html)
 
-            tmpl = """
-<html><head><base href="http://ejucovy.github.com/trac-docs/"><body>
+            tmpl = """---
+layout: main
+title: Index
+---
 <h1 class="name">Trac Docs</h1>
 
 <h2>Interfaces</h2>
@@ -114,8 +118,6 @@ class Pluginspector(Component):
   <li><a href="components/{{component}}/index.html">{{component}}</a></li>
 {{endfor}}
 </ul>
-
-</body></html>
 """
             tmpl = tempita.HTMLTemplate(tmpl)
             html = tmpl.substitute(locals())
