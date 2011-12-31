@@ -1,0 +1,2 @@
+# 
+from pluginspector.main import *
