@@ -45,9 +45,9 @@ class Pluginspector(Component):
             exec contents in ctx
         except:
             print >> sys.stderr, "Could not execute %s" % setup_py
-            return '<Error finding package for %s>' % object.__module__
+            return '<Error finding package for %s>' % object.__module__, {}
         assert 'metadata' in ctx, "Problem running %s" % setup_py
-        return ctx['metadata']['name']
+        return ctx['metadata']['name'], ctx['metadata']
 
     def get_data(self):
         packages = {}
@@ -57,11 +57,13 @@ class Pluginspector(Component):
             data = self._base_data(interface)
             data['implemented_by'] = []
             interfaces[data['name']] = data
-            data['package'] = self.try_to_find_package(interface)
+            data['package'], metadata = self.try_to_find_package(interface)
             packages.setdefault(data['package'], 
                                 {'interfaces': [],
                                  'components': [],
+                                 'data': {},
                                  })['interfaces'].append(data['name'])
+            packages[data['package']]['metadata'] = metadata
 
         components = {}
         for component in Component.__subclasses__():
@@ -76,11 +78,12 @@ class Pluginspector(Component):
             for imp in impl:
                 imp['implemented_by'].append(data['name'])
             components[data['name']] = data
-            data['package'] = self.try_to_find_package(component)
+            data['package'], metadata = self.try_to_find_package(component)
             packages.setdefault(data['package'], 
                                 {'interfaces': [],
                                  'components': [],
                                  })['components'].append(data['name'])
+            packages[data['package']]['metadata'] = metadata
 
         return components, interfaces, packages
 
@@ -153,6 +156,7 @@ title: {{name}}
 {{else}}
 <p><em>No documentation available</em></p>
 {{endif}}
+
 <h2>Interfaces Declared:</h2>
 <ul>
 {{for interface in interfaces}}
@@ -165,13 +169,21 @@ title: {{name}}
   <li><a href="components/{{component}}/index.html">{{component}}</a></li>
 {{endfor}}
 </ul>
+
+<h2>Package Metadata:</h2>
+<pre class="metadata">
+{{metadata|pformat}}
+</pre>
+
 """
-            tmpl = tempita.HTMLTemplate(tmpl)
+            from pprint import pformat
+            tmpl = tempita.HTMLTemplate(tmpl, namespace={'pformat': pformat})
             for package in packages:
                 ctx = dict(name=package,
                            interfaces=packages[package]['interfaces'],
                            components=packages[package]['components'],
-                           doc=None,
+                           doc=packages[package]['metadata'].get('description'),
+                           metadata=packages[package]['metadata'],
                            )
                 html = tmpl.substitute(ctx)
                 zipfile.writestr("packages/%s/index.html" % package, html)
