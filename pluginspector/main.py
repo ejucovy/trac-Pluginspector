@@ -40,12 +40,17 @@ class Pluginspector(Component):
         with open(setup_py) as f:
             contents = f.read()
         contents = contents.replace("setup(", "metadata=dict(")
+        contents = '\n'.join(contents.splitlines())
         ctx = {}
+        cwd = os.getcwd()
         try:
+            os.chdir(os.path.join(self.pkg_src_dir, dir))
             exec contents in ctx
         except:
             print >> sys.stderr, "Could not execute %s" % setup_py
             return '<Error finding package for %s>' % object.__module__, {}
+        finally:
+            os.chdir(cwd)
         assert 'metadata' in ctx, "Problem running %s" % setup_py
         return ctx['metadata']['name'], ctx['metadata']
 
@@ -87,17 +92,28 @@ class Pluginspector(Component):
             packages[data['package']]['metadata'] = metadata
 
             _options = []
+            _extension_points = []
 
             for attr in dir(component):
                 obj = getattr(component, attr, None)
                 try:
                     if obj and issubclass(obj.__class__, Option):
                         _options.append(obj)
+                        if hasattr(obj, 'xtnpt'):
+                            _extension_points.append(obj.xtnpt.interface)
+                    if obj and issubclass(obj.__class__, ExtensionPoint):
+                        _extension_points.append(obj.interface)
                 except:
                     continue
 
-            data['options'] = ["%s/%s" % (i.section, i.name) 
-                               for i in _options]
+            data['options'] = [{
+                    'name': opt.name,
+                    'section': opt.section,
+                    'type': opt.__class__.__name__,
+                    'default': opt.default
+                    } for opt in _options]
+            data['extension_points'] = ["%s.%s" % (i.__module__, i.__name__)
+                                        for i in _extension_points]
             for opt in _options:
                 opt_name = "%s/%s" % (opt.section, opt.name)
                 options[opt_name] = {
@@ -119,6 +135,7 @@ class Pluginspector(Component):
         zipfile = ZipFile(zip_filename, 'w')
         try:
             components, interfaces, packages, options = self.get_data()
+
             tmpl = """---
 layout: main
 title: {{name}}
@@ -158,6 +175,28 @@ title: {{name}}
   <li><a href="interfaces/{{interface}}/index.html">{{interface}}</a></li>
 {{endfor}}
 </ul>
+
+<h2>Contains via Extension Points:</h2>
+<ul>
+{{for interface in extension_points}}
+  <li><a href="interfaces/{{interface}}/index.html">{{interface}}</a></li>
+{{endfor}}
+</ul>
+
+<h2>Options:</h2>
+<table>
+  <thead>
+    <tr><th>Section</th><th>Name</th><th>Type</th><th>Default</th></tr>
+  </thead>
+{{for option in options}}
+  <tr>
+    <td>{{option['section']}}</td>
+    <td>{{option['name']}}</td>
+    <td>{{option['type']}}</td>
+    <td>{{option['default']}}</td>
+  </tr>
+{{endfor}}
+</table>
 """
             tmpl = tempita.HTMLTemplate(tmpl)
 
