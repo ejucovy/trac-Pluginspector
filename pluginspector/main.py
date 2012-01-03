@@ -110,7 +110,8 @@ class Pluginspector(Component):
                     'name': opt.name,
                     'section': opt.section,
                     'type': opt.__class__.__name__,
-                    'default': opt.default
+                    'default': opt.default,
+                    'doc': opt.__doc__,
                     } for opt in _options]
             data['extension_points'] = ["%s.%s" % (i.__module__, i.__name__)
                                         for i in _extension_points]
@@ -120,7 +121,8 @@ class Pluginspector(Component):
                     'name': opt.name,
                     'section': opt.section,
                     'type': opt.__class__.__name__,
-                    'default': opt.default
+                    'default': opt.default,
+                    'doc': opt.__doc__,
                     }
         return components, interfaces, packages, options
 
@@ -186,7 +188,7 @@ title: {{name}}
 <h2>Options:</h2>
 <table>
   <thead>
-    <tr><th>Section</th><th>Name</th><th>Type</th><th>Default</th></tr>
+    <tr><th>Section</th><th>Name</th><th>Type</th><th>Default</th><th>Docs</th></tr>
   </thead>
 {{for option in options}}
   <tr>
@@ -194,6 +196,7 @@ title: {{name}}
     <td>{{option['name']}}</td>
     <td>{{option['type']}}</td>
     <td>{{option['default']}}</td>
+    <td>{{option['doc']}}</td>
   </tr>
 {{endfor}}
 </table>
